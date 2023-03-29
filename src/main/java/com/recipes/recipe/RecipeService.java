@@ -1,9 +1,14 @@
 package com.recipes.recipe;
 
+import com.recipes.appuser.AppUser;
+import com.recipes.appuser.AppUserRepository;
 import jakarta.transaction.Transactional;
 import lombok.NonNull;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -11,14 +16,12 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 @Service
+@RequiredArgsConstructor
 public class RecipeService {
     private final RecipeRepository recipeRepository;
+    private final AppUserRepository appUserRepository;
     private final LocalDateTime date = LocalDateTime.now();
-
-    @Autowired
-    public RecipeService(RecipeRepository recipeRepository) {
-        this.recipeRepository = recipeRepository;
-    }
+    private final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
     public List<Recipe> getRecipes() {
         return recipeRepository.findAll();
@@ -45,8 +48,7 @@ public class RecipeService {
         boolean directionsContain =
                 Arrays.stream(recipe.getDirections())
                         .anyMatch(String::isBlank);
-        if (
-                recipe.getName().isBlank() ||
+        if (recipe.getName().isBlank() ||
                 recipe.getDescription().isBlank() ||
                 recipe.getCategory().isBlank() ||
                 recipe.getIngredients().length == 0 ||
@@ -58,35 +60,48 @@ public class RecipeService {
                     HttpStatus.BAD_REQUEST
             );
         }
+
         recipe.setDate(String.valueOf(date));
+
+        recipe.setAppUser(currentAppUser());
+
         recipeRepository.save(recipe);
 
         return recipe.getId();
     }
 
     public void deleteRecipe(Long id) {
-        boolean exists = recipeRepository.existsById(id);
-        if (!exists) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND
-            );
-        }
-        recipeRepository.deleteById(id);
-    }
-
-    @Transactional
-    public void updateRecipe(
-            Long id,
-            String name,
-            String category,
-            String description,
-            String[] ingredients,
-            String[] directions
-    ) {
         Recipe recipe = recipeRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND
                 ));
+
+        if (!recipe.getAppUser().equals(currentAppUser())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN
+            );
+        }
+
+        recipeRepository.deleteById(id);
+    }
+
+    @Transactional
+    public void updateRecipe(Long id,
+                             String name,
+                             String category,
+                             String description,
+                             String[] ingredients,
+                             String[] directions) {
+        Recipe recipe = recipeRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND
+                ));
+
+        if (!recipe.getAppUser().equals(currentAppUser())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN
+            );
+        }
 
         if (name != null &&
                 name.length() > 0 &&
@@ -140,4 +155,17 @@ public class RecipeService {
 
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
     }
+
+    public AppUser currentAppUser() {
+        String currentAppUserEmail = "";
+        if (auth.isAuthenticated() && auth.getPrincipal() instanceof UserDetails userDetails) {
+            currentAppUserEmail = userDetails.getUsername();
+        }
+
+        return appUserRepository.findByEmail(currentAppUserEmail)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND
+                ));
+    }
+
 }

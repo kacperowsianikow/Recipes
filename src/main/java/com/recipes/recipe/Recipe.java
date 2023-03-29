@@ -1,5 +1,7 @@
 package com.recipes.recipe;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.recipes.appuser.AppUser;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.Hibernate;
@@ -23,6 +25,7 @@ public class Recipe implements Comparable<Recipe> {
             strategy = GenerationType.SEQUENCE,
             generator = "recipe_sequence"
     )
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private Long id;
     private String name;
     private String category;
@@ -30,6 +33,13 @@ public class Recipe implements Comparable<Recipe> {
     private String description;
     private String[] ingredients;
     private String[] directions;
+    @ManyToOne
+    @JoinColumn(
+            nullable = false,
+            name = "app_user_id"
+    )
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private AppUser appUser;
 
     public Recipe(String name,
                   String category,

@@ -1,19 +1,15 @@
 package com.recipes.recipe;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
+@RequiredArgsConstructor
 public class RecipeController {
     private final RecipeService recipeService;
-
-    @Autowired
-    public RecipeController(RecipeService recipeService) {
-        this.recipeService = recipeService;
-    }
 
     @GetMapping("/api/recipe")
     public List<Recipe> getRecipes() {
@@ -62,7 +58,5 @@ public class RecipeController {
         return recipeService
                 .searchRecipesByNameOrCategory(name, category);
     }
-
-//    @PostMapping("/api/register")
 
 }
